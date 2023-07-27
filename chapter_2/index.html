@@ -1,0 +1,143 @@
+<!-- This example is a simple linear regression using tensor flow that will predict the time it takes to download a file -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Linear regression example</title>
+  </head>
+  <body>
+    <div id="content">
+      <p>
+        This is the evaluated value of the model after training using random
+        weights
+      </p>
+      <p id="random-output"></p>
+      <p>This is the average time it took all training data to download</p>
+      <p id="avg-delay"></p>
+      <p>
+        This is the hand calculated mean absolute error of the test data based
+        on the above constant, we can see that our model performs pretty poorly
+        by comparing the two output values
+      </p>
+      <p id="mae"></p>
+      <p>
+        Now we try adding more epochs (steps) to the training to give the model
+        a better chance to hone in on a better error rate
+      </p>
+      <p id="more-epochs"></p>
+      <p>And now we can make some predictions</p>
+      <p id="predictions"></p>
+    </div>
+  </body>
+</html>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+<script>
+  // for this example we are just hardcoding some data
+  const trainData = {
+    sizeMB: [
+      0.08, 9.0, 0.001, 0.1, 8.0, 5.0, 0.1, 6.0, 0.05, 0.5, 0.002, 2.0, 0.005,
+      10.0, 0.01, 7.0, 6.0, 5.0, 1.0, 1.0,
+    ],
+    timeSec: [
+      0.135, 0.739, 0.067, 0.126, 0.646, 0.435, 0.069, 0.497, 0.068, 0.116,
+      0.07, 0.289, 0.076, 0.744, 0.083, 0.56, 0.48, 0.399, 0.153, 0.149,
+    ],
+  };
+  const testData = {
+    sizeMB: [
+      5.0, 0.2, 0.001, 9.0, 0.002, 0.02, 0.008, 4.0, 0.001, 1.0, 0.005, 0.08,
+      0.8, 0.2, 0.05, 7.0, 0.005, 0.002, 8.0, 0.008,
+    ],
+    timeSec: [
+      0.425, 0.098, 0.052, 0.686, 0.066, 0.078, 0.07, 0.375, 0.058, 0.136,
+      0.052, 0.063, 0.183, 0.087, 0.066, 0.558, 0.066, 0.068, 0.61, 0.057,
+    ],
+  };
+
+  // convert the data into tensors
+  const trainTensors = {
+    sizeMB: tf.tensor2d(trainData.sizeMB, [20, 1]),
+    timeSec: tf.tensor2d(trainData.timeSec, [20, 1]),
+  };
+  const testTensors = {
+    sizeMB: tf.tensor2d(testData.sizeMB, [20, 1]),
+    timeSec: tf.tensor2d(testData.timeSec, [20, 1]),
+  };
+
+  // build the network
+  // inputShape refers to the input shape, a 1D tensor in this case, units is the output, in this case a single number
+  const model = tf.sequential();
+  model.add(tf.layers.dense({ inputShape: [1], units: 1 }));
+  // the dense layer applies a linear regression function (y = mx + b) to the input.
+  // where m is the `kernel` and b os the `bias`. x is `sizeMb` and y is the `timeSec` output
+
+  // now we tell the model how to train itself
+  model.compile({ optimizer: "sgd", loss: "meanAbsoluteError" });
+  // optimizer tells the model how to adjust the weights (kernel and bias), loss function tells the model how well it is doing
+  // meanAbsoluteError finds the average of the absolute values of the difference between the computed and expected value
+  // meanAbsoluteError = average(absolute(modelOutput - targets))
+  // 'sgd' stands for stochastic gradient descent, and is a calculus function that works to tune the weights (discussed later in the book)
+
+  // now ready to do the actual training
+  // this could potentially be a long running operation, so we use async await to prevent blocking the main thread (in this case an IIFE since we're in a script tag)
+  (async function () {
+    await model.fit(trainTensors.sizeMB, trainTensors.timeSec, { epochs: 10 });
+  })();
+
+  // training is done, now we need to evaluate the model.
+  // the evaluate method calculates the loss function (though doesn't update the weights).
+  // this gives us an idea of how well the model is doing
+  const output = model.evaluate(testTensors.sizeMB, testTensors.timeSec);
+  const randomContainer = document.querySelector("#random-output");
+  randomContainer.innerHTML = `<strong>Random Output:</strong> ${output}`;
+
+  // the above output will be pretty random because the weights start out as random values.
+  // it might be better to pick a constant as a starting point
+  // we can try using the average delay (time to download) for the training data
+  const avgDelaySec = tf.mean(trainData.timeSec);
+  const delayContainer = document.querySelector("#avg-delay");
+  delayContainer.innerHTML = `<strong>Average Delay (download time):</strong> ${avgDelaySec}`;
+
+  // now we can calculate the mean absolute error by hand and use that as a comparison to the output of our model
+  const mae = tf.mean(tf.abs(tf.sub(testData.timeSec, avgDelaySec)));
+  const maeContainer = document.querySelector("#mae");
+  maeContainer.innerHTML = `<strong>Mean Absolute Error (by hand):</strong> ${mae}`;
+
+  // so as we can see out model is currently performing pretty badly
+  // one reason is because we aren't using enough epochs (steps) in the training
+  // so the model doesn't get enough chances to update and home in on a better error rate
+  // we'll try updating the epoch value and see if things start looking better
+  // using a second model here so we can compare the difference
+  const model2 = tf.sequential();
+  model2.add(tf.layers.dense({ inputShape: [1], units: 1 }));
+  model2.compile({ optimizer: "sgd", loss: "meanAbsoluteError" });
+  (async function () {
+    await model2.fit(trainTensors.sizeMB, trainTensors.timeSec, {
+      epochs: 200,
+    });
+  })();
+
+  const betterOutput = model2.evaluate(testTensors.sizeMB, testTensors.timeSec);
+  const moreEpochsContainer = document.querySelector("#more-epochs");
+  moreEpochsContainer.innerHTML = `<strong>More Epochs Output:</strong> ${betterOutput}`;
+
+  // these results look better (thought not as good for me as they seem to be in the book?)
+  // now we can try doing some actual prediction
+  const smallFileMB = 1;
+  const bigFileMB = 100;
+  const hugeFileMB = 10000;
+  const predictionResults = model2.predict(
+    tf.tensor2d([[smallFileMB], [bigFileMB], [hugeFileMB]])
+  );
+  const predictionContainer = document.querySelector("#predictions");
+  predictionContainer.innerHTML = predictionResults;
+  // books predicted values
+  // Tensor
+  //     [[0.1373825  ],
+  //      [7.2438402  ],
+  //      [717.8896484]]
+
+  // my results are looking a bit different here, but in the book they are doing all of this at this codepen (https://codepen.io/tfjs-book/pen/VEVMMd),
+  // so maybe I am missing some things that they are doing there that they aren't making as explicit in the little examples they give in the book
+</script>
