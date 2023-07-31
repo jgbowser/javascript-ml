@@ -25,12 +25,19 @@
  *                   column as 1d tensors.
  */
 export function determineMeanAndStddev(data) {
+  console.log("STD here")
+  data.print();
   const dataMean = data.mean(0);
+  dataMean.print();
   // TODO(bileschi): Simplify when and if tf.var / tf.std added to the API.
   const diffFromMean = data.sub(dataMean);
+  diffFromMean.print();
   const squaredDiffFromMean = diffFromMean.square();
+  squaredDiffFromMean.print();
   const variance = squaredDiffFromMean.mean(0);
+  variance.print();
   const dataStd = variance.sqrt();
+  dataStd.print();
   return {dataMean, dataStd};
 }
 
